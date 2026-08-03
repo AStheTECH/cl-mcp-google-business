@@ -1,0 +1,15 @@
+{
+  "manifest_version": 1,
+  "server": {
+    "name": "mewcp-google-business",
+    "package": "google_business_mcp",
+    "auth": "oauth",
+    "version": "v1.0.0",
+    "api_base": null
+  },
+  "tools": {
+    "groups": {}
+  },
+  "resources": {},
+  "prompts": {}
+}
