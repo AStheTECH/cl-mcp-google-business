@@ -9,3 +9,14 @@ __pycache__/
 .env
 *.log
 .DS_Store
+
+build/
+dist/
+wheels/
+*.egg-info
+.venv
+env/
+/pyproject.toml
+/.python-version
+*.lock
+*_api_docs/
