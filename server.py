@@ -5,10 +5,10 @@ import logging
 
 from fastmcp import FastMCP
 from fastmcp_credentials import CredentialMiddleware, HeaderCredentialBackend
+from starlette.responses import JSONResponse
 
 from google_business_mcp.cli import parse_args
-from google_business_mcp.config import configure_logging
-from google_business_mcp.tools import register_tools
+from google_business_mcp.config import BREAKING_CHANGES, SERVER_VERSION, configure_logging
 
 configure_logging()
 logger = logging.getLogger("google-business-mcp-server")
@@ -16,9 +16,24 @@ logger = logging.getLogger("google-business-mcp-server")
 backend = HeaderCredentialBackend()
 mcp = FastMCP(
     "MewCP Google Business MCP Server",
+    version=SERVER_VERSION,
     middleware=[CredentialMiddleware(backend, "oauth")],
 )
-register_tools(mcp)
+
+# No tools registered yet — grow this server with /mcp-maintainer-agent
+# once API docs are available.
+
+
+# /health MUST come before mcp.http_app() — routes are baked at http_app() time
+@mcp.custom_route("/health", methods=["GET"])
+async def health_check(request):
+    return JSONResponse({
+        "status": "healthy",
+        "service": mcp.name,
+        "version": SERVER_VERSION,
+        "breaking_changes": BREAKING_CHANGES,
+    })
+
 
 # Expose ASGI app for hosting platform's (e.g. Vercel) Python runtime.
 app = mcp.http_app(path="/mcp", transport="streamable-http", stateless_http=True)
