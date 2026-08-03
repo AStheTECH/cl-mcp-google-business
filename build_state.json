@@ -18,8 +18,8 @@
     "google_locations": ["search_google_locations.md"],
     "performance": ["get_daily_metrics_time_series.md", "fetch_multi_daily_metrics_time_series.md", "list_search_keyword_impressions_monthly.md"]
   },
-  "validation_rounds": 0,
-  "validation_passed": false,
+  "validation_rounds": 1,
+  "validation_passed": true,
   "docs_status_written": false,
   "readme": false
 }
