@@ -8,7 +8,407 @@
     "api_base": null
   },
   "tools": {
-    "groups": {}
+    "groups": {
+      "locations": {
+        "file": "locations_tools.py",
+        "doc_source": ["list_locations.md", "create_location.md", "get_location.md", "update_location.md", "delete_location.md", "get_google_updated_location.md", "get_location_attributes.md", "update_location_attributes.md", "get_google_updated_location_attributes.md"],
+        "register_fn": "register_locations_tools",
+        "tools": {
+          "list_locations": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/accounts/{accountsId}/locations",
+            "description": "Lists the locations for the specified account, optionally filtered and sorted, and returns the matching Location objects with pagination info.",
+            "tier": "GET",
+            "params": [
+              { "name": "parent", "type": "string", "required": true, "description": "The name of the account to fetch locations from. If the parent Account is of type PERSONAL, only directly-owned Locations are returned; otherwise all accessible locations (direct or indirect) are returned." },
+              { "name": "readMask", "type": "string", "required": true, "description": "Comma-separated list of fully qualified field names to return. Example: \"user.displayName,photo\"." },
+              { "name": "pageSize", "type": "integer", "required": false, "description": "How many locations to fetch per page. Default 10, minimum 1, maximum 100." },
+              { "name": "pageToken", "type": "string", "required": false, "description": "Fetches the next page; returned by a previous call when more locations exist than fit the page size." },
+              { "name": "filter", "type": "string", "required": false, "description": "Filter constraining which locations to return. Empty means no constraints (all locations, paginated). See Google's \"Work with Location Data\" guide for valid fields." },
+              { "name": "orderBy", "type": "string", "required": false, "description": "Comma-separated sort fields (SQL syntax). Default ascending; append \" desc\" for descending. Valid fields: title, storeCode. E.g. \"title, storeCode desc\"." }
+            ],
+            "response_fields": [
+              { "name": "locations", "type": "array" },
+              { "name": "nextPageToken", "type": "string" },
+              { "name": "totalSize", "type": "integer" }
+            ],
+            "schema": { "data": "LocationListData", "result": "LocationListResult" }
+          },
+          "create_location": {
+            "endpoint": "POST https://mybusinessbusinessinformation.googleapis.com/v1/accounts/{accountsId}/locations",
+            "description": "Creates a new Location that will be owned by the logged-in user, and returns the newly created Location.",
+            "tier": "CREATE",
+            "params": [
+              { "name": "parent", "type": "string", "required": true, "description": "The name of the account in which to create this location." },
+              { "name": "location", "type": "object", "required": true, "description": "Location object to create. Full schema: see get_location. Required sub-fields per the Location schema: title (and primaryCategory within categories if categories are set)." },
+              { "name": "validateOnly", "type": "boolean", "required": false, "description": "If true, validates the request without actually creating the location." },
+              { "name": "requestId", "type": "string", "required": false, "description": "A unique request ID for the server to detect duplicate requests. UUIDs recommended. Max 50 characters." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "languageCode", "type": "string" },
+              { "name": "storeCode", "type": "string" },
+              { "name": "title", "type": "string" },
+              { "name": "phoneNumbers", "type": "object" },
+              { "name": "categories", "type": "object" },
+              { "name": "storefrontAddress", "type": "object" },
+              { "name": "websiteUri", "type": "string" },
+              { "name": "regularHours", "type": "object" },
+              { "name": "specialHours", "type": "object" },
+              { "name": "serviceArea", "type": "object" },
+              { "name": "labels", "type": "array" },
+              { "name": "adWordsLocationExtensions", "type": "object" },
+              { "name": "latlng", "type": "object" },
+              { "name": "openInfo", "type": "object" },
+              { "name": "metadata", "type": "object" },
+              { "name": "profile", "type": "object" },
+              { "name": "relationshipData", "type": "object" },
+              { "name": "moreHours", "type": "array" },
+              { "name": "serviceItems", "type": "array" }
+            ],
+            "schema": { "data": "LocationCreateData", "result": "LocationCreateResult" }
+          },
+          "get_location": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}",
+            "description": "Returns the specified location as last set by the merchant; may not reflect updates from Google or user-generated content live on Google Maps.",
+            "tier": "GET",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "The name of the location to fetch." },
+              { "name": "readMask", "type": "string", "required": true, "description": "Read mask specifying which fields to return in the response. Comma-separated list of fully qualified field names. Example: \"title,websiteUri\"." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "languageCode", "type": "string" },
+              { "name": "storeCode", "type": "string" },
+              { "name": "title", "type": "string" },
+              { "name": "phoneNumbers", "type": "object" },
+              { "name": "categories", "type": "object" },
+              { "name": "storefrontAddress", "type": "object" },
+              { "name": "websiteUri", "type": "string" },
+              { "name": "regularHours", "type": "object" },
+              { "name": "specialHours", "type": "object" },
+              { "name": "serviceArea", "type": "object" },
+              { "name": "labels", "type": "array" },
+              { "name": "adWordsLocationExtensions", "type": "object" },
+              { "name": "latlng", "type": "object" },
+              { "name": "openInfo", "type": "object" },
+              { "name": "metadata", "type": "object" },
+              { "name": "profile", "type": "object" },
+              { "name": "relationshipData", "type": "object" },
+              { "name": "moreHours", "type": "array" },
+              { "name": "serviceItems", "type": "array" }
+            ],
+            "schema": { "data": "LocationGetData", "result": "LocationGetResult" }
+          },
+          "update_location": {
+            "endpoint": "PATCH https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}",
+            "description": "Updates the specified location's fields per the given update mask, and returns the updated Location.",
+            "tier": "UPDATE",
+            "params": [
+              { "name": "location.name", "type": "string", "required": true, "description": "Google identifier for this location, in the form locations/{locationId}." },
+              { "name": "updateMask", "type": "string", "required": true, "description": "The specific fields to update. Comma-separated list of fully qualified field names. Example: \"user.displayName,photo\"." },
+              { "name": "location", "type": "object", "required": true, "description": "Location object carrying the updated field values. Full schema: see get_location." },
+              { "name": "validateOnly", "type": "boolean", "required": false, "description": "If true, validates the request without actually updating; response is empty unless there are validation errors." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "languageCode", "type": "string" },
+              { "name": "storeCode", "type": "string" },
+              { "name": "title", "type": "string" },
+              { "name": "phoneNumbers", "type": "object" },
+              { "name": "categories", "type": "object" },
+              { "name": "storefrontAddress", "type": "object" },
+              { "name": "websiteUri", "type": "string" },
+              { "name": "regularHours", "type": "object" },
+              { "name": "specialHours", "type": "object" },
+              { "name": "serviceArea", "type": "object" },
+              { "name": "labels", "type": "array" },
+              { "name": "adWordsLocationExtensions", "type": "object" },
+              { "name": "latlng", "type": "object" },
+              { "name": "openInfo", "type": "object" },
+              { "name": "metadata", "type": "object" },
+              { "name": "profile", "type": "object" },
+              { "name": "relationshipData", "type": "object" },
+              { "name": "moreHours", "type": "array" },
+              { "name": "serviceItems", "type": "array" }
+            ],
+            "schema": { "data": "LocationUpdateData", "result": "LocationUpdateResult", "note": "LocationUpdateData holds before: LocationData and after: LocationData (UPDATE-tier pattern)." }
+          },
+          "delete_location": {
+            "endpoint": "DELETE https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}",
+            "description": "Deletes a location; if it can't be deleted via the API, the Google Business Profile website must be used instead.",
+            "tier": "DELETE",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "The name of the location to delete." }
+            ],
+            "response_fields": [],
+            "schema": { "data": "LocationDeleteData", "result": "LocationDeleteResult" }
+          },
+          "get_google_updated_location": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}:getGoogleUpdated",
+            "description": "Returns the specified location as it appears live on Google Maps and Search, which may differ from the merchant's version, along with masks of what Google changed and what's still pending.",
+            "tier": "GET",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "The name of the location to fetch." },
+              { "name": "readMask", "type": "string", "required": true, "description": "Comma-separated list of fully qualified field names to return. Example: \"user.displayName,photo\"." }
+            ],
+            "response_fields": [
+              { "name": "location", "type": "object" },
+              { "name": "diffMask", "type": "string" },
+              { "name": "pendingMask", "type": "string" }
+            ],
+            "schema": { "data": "GoogleUpdatedLocationGetData", "result": "GoogleUpdatedLocationGetResult" }
+          },
+          "get_location_attributes": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}/attributes",
+            "description": "Retrieves attributes for a location as last set by the merchant.",
+            "tier": "GET",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "Google identifier for this location, in the form locations/{locationId}/attributes." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "attributes", "type": "array" },
+              { "name": "attributes[].name", "type": "string" },
+              { "name": "attributes[].valueType", "type": "string" },
+              { "name": "attributes[].values", "type": "array" },
+              { "name": "attributes[].repeatedEnumValue", "type": "object" },
+              { "name": "attributes[].uriValues", "type": "array" }
+            ],
+            "schema": { "data": "LocationAttributesGetData", "result": "LocationAttributesGetResult" }
+          },
+          "update_location_attributes": {
+            "endpoint": "PATCH https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}/attributes",
+            "description": "Updates attributes for a given location per the given attribute mask, and returns the updated Attributes.",
+            "tier": "UPDATE",
+            "params": [
+              { "name": "attributes.name", "type": "string", "required": true, "description": "Google identifier for this location, in the form locations/{locationId}/attributes." },
+              { "name": "attributeMask", "type": "string", "required": true, "description": "Attribute names (as attributes/{attribute}) to update. Updates: every attribute you want updated must be in both attributes and attributeMask — attributes in attributes but not in attributeMask are ignored. Deletes: to delete an attribute, put it in attributeMask with no matching entry in attributes; to delete all attributes, look up all applicable attributes and add them to attributeMask with an empty attributes field. Comma-separated fully qualified field names." },
+              { "name": "name", "type": "string", "required": true, "description": "Google identifier for this location, in the form locations/{locationId}/attributes (body field, same value as attributes.name)." },
+              { "name": "attributes", "type": "array", "required": false, "description": "The attributes to set (each with name, valueType, values, repeatedEnumValue, uriValues). May be empty when deleting all attributes via attributeMask." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "attributes", "type": "array" },
+              { "name": "attributes[].name", "type": "string" },
+              { "name": "attributes[].valueType", "type": "string" },
+              { "name": "attributes[].values", "type": "array" },
+              { "name": "attributes[].repeatedEnumValue", "type": "object" },
+              { "name": "attributes[].uriValues", "type": "array" }
+            ],
+            "schema": { "data": "LocationAttributesUpdateData", "result": "LocationAttributesUpdateResult", "note": "LocationAttributesUpdateData holds before: LocationAttributesData and after: LocationAttributesData (UPDATE-tier pattern)." }
+          },
+          "get_google_updated_location_attributes": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/locations/{locationsId}/attributes:getGoogleUpdated",
+            "description": "Retrieves attributes for a location as they appear live on Google Maps and Search, which may differ from the merchant's version.",
+            "tier": "GET",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "Google identifier for this location, in the form locations/{locationId}/attributes." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "attributes", "type": "array" },
+              { "name": "attributes[].name", "type": "string" },
+              { "name": "attributes[].valueType", "type": "string" },
+              { "name": "attributes[].values", "type": "array" },
+              { "name": "attributes[].repeatedEnumValue", "type": "object" },
+              { "name": "attributes[].uriValues", "type": "array" }
+            ],
+            "schema": { "data": "GoogleUpdatedLocationAttributesGetData", "result": "GoogleUpdatedLocationAttributesGetResult" }
+          }
+        }
+      },
+      "chains": {
+        "file": "chains_tools.py",
+        "doc_source": ["get_chain.md", "search_chains.md"],
+        "register_fn": "register_chains_tools",
+        "tools": {
+          "get_chain": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/chains/{chainsId}",
+            "description": "Gets the specified chain, returning NOT_FOUND if the chain does not exist.",
+            "tier": "GET",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "The chain's resource name, in the format `chains/{chain_place_id}`." }
+            ],
+            "response_fields": [
+              { "name": "name", "type": "string" },
+              { "name": "chainNames[]", "type": "object (ChainName)" },
+              { "name": "websites[]", "type": "object (ChainUri)" },
+              { "name": "locationCount", "type": "integer" }
+            ],
+            "schema": { "data": "ChainData", "result": "ChainResult" }
+          },
+          "search_chains": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/chains:search",
+            "description": "Searches for a chain based on chain name and returns the list of matching chains.",
+            "tier": "GET",
+            "params": [
+              { "name": "chainName", "type": "string", "required": true, "description": "Search for a chain by its name. Exact/partial/fuzzy/related queries are supported. Examples: \"walmart\", \"wal-mart\", \"walmmmart\", \"沃尔玛\"." },
+              { "name": "pageSize", "type": "integer", "required": false, "description": "The maximum number of matched chains to return from this query. Default is 10, maximum is 500." }
+            ],
+            "response_fields": [
+              { "name": "chains[]", "type": "object (Chain)" }
+            ],
+            "schema": { "data": "ChainsData", "result": "ChainsResult" }
+          }
+        }
+      },
+      "categories": {
+        "file": "categories_tools.py",
+        "doc_source": ["list_categories.md", "batch_get_categories.md"],
+        "register_fn": "register_categories_tools",
+        "tools": {
+          "list_categories": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/categories",
+            "description": "Returns a list of business categories matched by the front of the category name (e.g. 'food' matches 'Food Court' but not 'Fast Food Restaurant').",
+            "tier": "GET",
+            "params": [
+              { "name": "regionCode", "type": "string", "required": true, "description": "The ISO 3166-1 alpha-2 country code." },
+              { "name": "languageCode", "type": "string", "required": true, "description": "The BCP 47 code of the language." },
+              { "name": "filter", "type": "string", "required": false, "description": "Filter string from the user; the only supported field is `displayName`, e.g. `filter=displayName=foo`." },
+              { "name": "pageSize", "type": "integer", "required": false, "description": "How many categories to fetch per page. Default is 100, minimum is 1, maximum is 100." },
+              { "name": "pageToken", "type": "string", "required": false, "description": "If specified, fetches the next page of categories." },
+              { "name": "view", "type": "enum (CategoryView)", "required": true, "description": "Specifies which parts of the Category resource to return. Values: `CATEGORY_VIEW_UNSPECIFIED` (equivalent to `BASIC`), `BASIC` (only `displayName`, `category_id`, `languageCode`), `FULL` (all fields)." }
+            ],
+            "response_fields": [
+              { "name": "categories[]", "type": "object (Location.Category)" },
+              { "name": "nextPageToken", "type": "string" }
+            ],
+            "schema": { "data": "CategoriesData", "result": "CategoriesResult" }
+          },
+          "batch_get_categories": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/categories:batchGet",
+            "description": "Returns a list of business categories for the provided language and category (GConcept) IDs.",
+            "tier": "GET",
+            "params": [
+              { "name": "names[]", "type": "string", "required": true, "description": "The GConcept ids the localized category names should be returned for. Repeat this parameter to request more than one category; at least one name must be set." },
+              { "name": "languageCode", "type": "string", "required": true, "description": "The BCP 47 code of the language that the category names should be returned in." },
+              { "name": "regionCode", "type": "string", "required": false, "description": "The ISO 3166-1 alpha-2 country code used to infer non-standard language." },
+              { "name": "view", "type": "enum (CategoryView)", "required": true, "description": "Specifies which parts of the Category resource to return. Values: `CATEGORY_VIEW_UNSPECIFIED` (equivalent to `BASIC`), `BASIC` (only `displayName`, `category_id`, `languageCode`), `FULL` (all fields)." }
+            ],
+            "response_fields": [
+              { "name": "categories[]", "type": "object (Location.Category)" }
+            ],
+            "schema": { "data": "CategoryListData", "result": "CategoryListResult" }
+          }
+        }
+      },
+      "attributes": {
+        "file": "attributes_tools.py",
+        "doc_source": ["list_available_attributes.md"],
+        "register_fn": "register_attributes_tools",
+        "tools": {
+          "list_available_attributes": {
+            "endpoint": "GET https://mybusinessbusinessinformation.googleapis.com/v1/attributes",
+            "description": "Returns the list of attributes that would be available for a location with the given primary category and country.",
+            "tier": "GET",
+            "params": [
+              { "name": "parent", "type": "string", "required": false, "description": "Resource name of the location to look up available attributes for. If set, categoryName, regionCode, languageCode and showAll are not required and must not be set." },
+              { "name": "categoryName", "type": "string", "required": false, "description": "The primary category stable ID to find available attributes. Must be of the format categories/{category_id}." },
+              { "name": "regionCode", "type": "string", "required": false, "description": "The ISO 3166-1 alpha-2 country code to find available attributes." },
+              { "name": "languageCode", "type": "string", "required": false, "description": "The BCP 47 code of language to get attribute display names in. Falls back to English if unavailable." },
+              { "name": "showAll", "type": "boolean", "required": false, "description": "If true, metadata for all available attributes is returned, disregarding parent and categoryName. languageCode and regionCode are required when this is true." },
+              { "name": "pageSize", "type": "integer", "required": false, "description": "How many attributes to include per page. Default is 200, minimum is 1." },
+              { "name": "pageToken", "type": "string", "required": false, "description": "If specified, the next page of attribute metadata is retrieved." }
+            ],
+            "response_fields": [
+              { "name": "attributeMetadata[]", "type": "object (AttributeMetadata)" },
+              { "name": "attributeMetadata[].parent", "type": "string" },
+              { "name": "attributeMetadata[].valueType", "type": "enum (AttributeValueType)" },
+              { "name": "attributeMetadata[].displayName", "type": "string" },
+              { "name": "attributeMetadata[].groupDisplayName", "type": "string" },
+              { "name": "attributeMetadata[].repeatable", "type": "boolean" },
+              { "name": "attributeMetadata[].valueMetadata[]", "type": "object (AttributeValueMetadata)" },
+              { "name": "attributeMetadata[].deprecated", "type": "boolean" },
+              { "name": "nextPageToken", "type": "string" }
+            ],
+            "schema": { "data": "AvailableAttributesData", "result": "AvailableAttributesResult" }
+          }
+        }
+      },
+      "google_locations": {
+        "file": "google_locations_tools.py",
+        "doc_source": ["search_google_locations.md"],
+        "register_fn": "register_google_locations_tools",
+        "tools": {
+          "search_google_locations": {
+            "endpoint": "POST https://mybusinessbusinessinformation.googleapis.com/v1/googleLocations:search",
+            "description": "Searches all of the possible locations on Google that are a match to the specified request and returns the matching GoogleLocation entries.",
+            "tier": "GET",
+            "params": [
+              { "name": "pageSize", "type": "integer", "required": false, "description": "The number of matches to return. Default is 3, maximum is 10. No pagination." },
+              { "name": "location", "type": "object (Location)", "required": false, "description": "Union field `search_query` (exactly one of `location` or `query` is required). Location to search for — if provided, finds locations matching the provided details. Full Location schema: see get_location." },
+              { "name": "query", "type": "string", "required": false, "description": "Union field `search_query` (exactly one of `location` or `query` is required). Text query to search for. Less accurate than an exact location, but can surface more inexact matches." }
+            ],
+            "response_fields": [
+              { "name": "googleLocations[]", "type": "object (GoogleLocation)" },
+              { "name": "googleLocations[].name", "type": "string" },
+              { "name": "googleLocations[].location", "type": "object (Location)" },
+              { "name": "googleLocations[].requestAdminRightsUri", "type": "string" }
+            ],
+            "schema": { "data": "GoogleLocationsData", "result": "GoogleLocationsResult" }
+          }
+        }
+      },
+      "performance": {
+        "file": "performance_tools.py",
+        "doc_source": ["get_daily_metrics_time_series.md", "fetch_multi_daily_metrics_time_series.md", "list_search_keyword_impressions_monthly.md"],
+        "register_fn": "register_performance_tools",
+        "tools": {
+          "get_daily_metrics_time_series": {
+            "endpoint": "GET https://businessprofileperformance.googleapis.com/v1/locations/{locationsId}:getDailyMetricsTimeSeries",
+            "description": "Returns the values for each date in a given time range for a single specified daily metric. Only daily data is available; hourly metrics are not supported.",
+            "tier": "GET",
+            "params": [
+              { "name": "name", "type": "string", "required": true, "description": "The location for which the time series should be fetched. Format: `locations/{locationId}` where `locationId` is an unobfuscated listing id." },
+              { "name": "dailyMetric", "type": "enum (DailyMetric)", "required": true, "description": "The metric to retrieve time series for. One of: `DAILY_METRIC_UNKNOWN`, `BUSINESS_IMPRESSIONS_DESKTOP_MAPS`, `BUSINESS_IMPRESSIONS_DESKTOP_SEARCH`, `BUSINESS_IMPRESSIONS_MOBILE_MAPS`, `BUSINESS_IMPRESSIONS_MOBILE_SEARCH`, `BUSINESS_CONVERSATIONS`, `BUSINESS_DIRECTION_REQUESTS`, `CALL_CLICKS`, `WEBSITE_CLICKS`, `BUSINESS_BOOKINGS`, `BUSINESS_FOOD_ORDERS`, `BUSINESS_FOOD_MENU_CLICKS`." },
+              { "name": "dailyRange", "type": "object (DailyRange)", "required": true, "description": "The timerange to fetch. `{ \"startDate\": {\"year\",\"month\",\"day\"}, \"endDate\": {\"year\",\"month\",\"day\"} }`, both inclusive." },
+              { "name": "dailySubEntityType", "type": "object (DailySubEntityType)", "required": false, "description": "The sub-entity type/id the time series relates to. Currently no `DailyMetric` supports this (breakdown not available). Union of `dayOfWeek` (enum) or `timeOfDay` (`{hours, minutes, seconds, nanos}`)." }
+            ],
+            "response_fields": [
+              { "name": "timeSeries", "type": "object (TimeSeries)" },
+              { "name": "timeSeries.datedValues[]", "type": "object (DatedValue)" }
+            ],
+            "schema": { "data": "DailyMetricsTimeSeriesData", "result": "DailyMetricsTimeSeriesResult" }
+          },
+          "fetch_multi_daily_metrics_time_series": {
+            "endpoint": "GET https://businessprofileperformance.googleapis.com/v1/locations/{locationsId}:fetchMultiDailyMetricsTimeSeries",
+            "description": "Returns the values for each date in a given time range for multiple specified daily metrics at once. Only daily data is available; hourly metrics are not supported.",
+            "tier": "GET",
+            "params": [
+              { "name": "location", "type": "string", "required": true, "description": "The location for which the time series should be fetched. Format: `locations/{locationId}` where `locationId` is an unobfuscated listing id." },
+              { "name": "dailyMetrics[]", "type": "enum (DailyMetric)", "required": true, "description": "The metrics to retrieve time series for. Same enum values as `get_daily_metrics_time_series` (`WEBSITE_CLICKS`, `CALL_CLICKS`, `BUSINESS_IMPRESSIONS_DESKTOP_MAPS`, etc.). Repeat this parameter for multiple metrics." },
+              { "name": "dailyRange", "type": "object (DailyRange)", "required": true, "description": "The timerange to fetch. `{ \"startDate\": {\"year\",\"month\",\"day\"}, \"endDate\": {\"year\",\"month\",\"day\"} }`, both inclusive." }
+            ],
+            "response_fields": [
+              { "name": "multiDailyMetricTimeSeries[]", "type": "object (MultiDailyMetricTimeSeries)" },
+              { "name": "multiDailyMetricTimeSeries[].dailyMetricTimeSeries[]", "type": "object (DailyMetricTimeSeries)" },
+              { "name": "multiDailyMetricTimeSeries[].dailyMetricTimeSeries[].dailyMetric", "type": "enum (DailyMetric)" },
+              { "name": "multiDailyMetricTimeSeries[].dailyMetricTimeSeries[].dailySubEntityType", "type": "object (DailySubEntityType)" },
+              { "name": "multiDailyMetricTimeSeries[].dailyMetricTimeSeries[].timeSeries", "type": "object (TimeSeries)" }
+            ],
+            "schema": { "data": "MultiDailyMetricsTimeSeriesData", "result": "MultiDailyMetricsTimeSeriesResult" }
+          },
+          "list_search_keyword_impressions_monthly": {
+            "endpoint": "GET https://businessprofileperformance.googleapis.com/v1/locations/{locationsId}/searchkeywords/impressions/monthly",
+            "description": "Returns the search keywords used to find a business in Search or Maps, each accompanied by impression counts aggregated on a monthly basis.",
+            "tier": "GET",
+            "params": [
+              { "name": "parent", "type": "string", "required": true, "description": "The location for which the time series should be fetched. Format: `locations/{locationId}` where `locationId` is an unobfuscated listing id." },
+              { "name": "monthlyRange", "type": "object (MonthlyRange)", "required": true, "description": "The range in months to aggregate search keyword impressions over. `{ \"startMonth\": {\"year\",\"month\",\"day\"}, \"endMonth\": {\"year\",\"month\",\"day\"} }`, both inclusive — only year and month are considered." },
+              { "name": "pageSize", "type": "integer", "required": false, "description": "Number of results requested. Default 100, maximum 100." },
+              { "name": "pageToken", "type": "string", "required": false, "description": "Base64-encoded token indicating the next paginated result to return." }
+            ],
+            "response_fields": [
+              { "name": "searchKeywordsCounts[]", "type": "object (SearchKeywordCount)" },
+              { "name": "searchKeywordsCounts[].searchKeyword", "type": "string" },
+              { "name": "searchKeywordsCounts[].insightsValue", "type": "object (InsightsValue)" },
+              { "name": "nextPageToken", "type": "string" }
+            ],
+            "schema": { "data": "SearchKeywordImpressionsMonthlyData", "result": "SearchKeywordImpressionsMonthlyResult" }
+          }
+        }
+      }
+    }
   },
   "resources": {},
   "prompts": {}
