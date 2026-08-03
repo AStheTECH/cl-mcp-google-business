@@ -1,393 +1,642 @@
-**Manage your Google Business Profile - reviews, posts, locations, and insights - with Agents.**
+**Manage Google Business Profile locations and performance insights — with Agents.**
 
-A Model Context Protocol (MCP) server that exposes Google Business Profile's API for managing business locations, customer reviews, posts, and performance analytics.
+A Model Context Protocol (MCP) server that exposes Google's My Business Business Information API and Business Profile Performance API for managing business location profiles, their attributes, and analyzing how those locations perform on Google Search and Maps.
 
 
 ## Overview
 
-The Google Business MCP Server provides full management of your Google Business Profile presence:
+The mewcp-google-business MCP Server provides direct, OAuth-authenticated access to Google Business Profile location data and performance analytics:
 
-- Manage business locations and profile information
-- Read, reply to, and track customer reviews
-- Create and delete business posts and updates
-- Fetch performance insights and review analytics
+- Full location lifecycle management — list, create, read, update, and delete locations and their custom attributes, with before/after records for every update
+- Reference lookups against Google's category, chain, and attribute-metadata taxonomies, plus matching against Google's own location records
+- Business Profile Performance analytics — daily and multi-metric time series and monthly search-keyword impression counts
+
+The server reaches both upstream Google APIs — `mybusinessbusinessinformation` v1 and `businessprofileperformance` v1 — via OAuth: it exchanges your connected Google credential's access token for calls made through the official Google API Python Client SDK (`googleapiclient`), requesting the `https://www.googleapis.com/auth/business.manage` scope.
 
 Perfect for:
 
-- Business owners automating review responses and post publishing
-- Marketing teams monitoring performance metrics across locations
-- Developers building Google Business Profile integrations
+- Agencies and business owners managing multi-location Business Profiles programmatically
+- Marketing and operations teams tracking impressions, clicks, and search-keyword trends across locations
+- Developers building Business Profile integrations that need category, attribute, and chain reference data alongside location CRUD
 
 
 ## Tools
 
-### Profile & Locations
+### Locations
 
 <details>
-<summary><code>list_accounts</code> — List all Business Profile accounts</summary>
+<summary><code>list_locations</code> — List locations for an account, with optional filtering, sorting, and pagination</summary>
 
-Returns all Google Business Profile accounts accessible by the authenticated user.
+Lists the locations for the specified account, optionally filtered and sorted, and returns the matching Location objects with pagination info.
 
 **Inputs:**
 ```
-None
+- `parent` (string, required) — The name of the account to fetch locations from. If the parent Account is of type PERSONAL, only directly-owned Locations are returned; otherwise all accessible locations (direct or indirect) are returned.
+- `read_mask` (string, required) — Comma-separated list of fully qualified field names to return. Example: "user.displayName,photo".
+- `page_size` (integer, optional) — How many locations to fetch per page. Default 10, minimum 1, maximum 100.
+- `page_token` (string, optional) — Fetches the next page; returned by a previous call when more locations exist than fit the page size.
+- `filter_` (string, optional) — Filter constraining which locations to return. Empty means no constraints (all locations, paginated). See Google's "Work with Location Data" guide for valid fields.
+- `order_by` (string, optional) — Comma-separated sort fields (SQL syntax). Default ascending; append " desc" for descending. Valid fields: title, storeCode. E.g. "title, storeCode desc".
 ```
 
-**Output:**
+**Output `data` schema:**
 
-```json
-[
-  {
-    "name": "accounts/123456789",
-    "accountName": "Acme Corp",
-    "type": "PERSONAL",
-    "verificationState": "VERIFIED",
-    "vettedState": "NOT_VETTED"
-  }
-]
-```
-
-</details>
-
-<details>
-<summary><code>list_locations</code> — List locations under an account</summary>
-
-Returns all business locations under a given account.
-
-**Inputs:**
-```
-- `account_name` (string, required) — Account resource name, e.g. `accounts/123456789`
-```
-
-**Output:**
-
-```json
-[
-  {
-    "name": "accounts/123456789/locations/987654321",
-    "locationName": "Acme Corp - Downtown",
-    "primaryPhone": "+1-555-555-0100",
-    "websiteUrl": "https://acme.example.com",
-    "primaryCategory": {
-      "displayName": "Coffee Shop"
-    }
-  }
-]
-```
-
-</details>
-
-<details>
-<summary><code>get_location</code> — Get a specific business location</summary>
-
-Returns detailed information about a specific business location.
-
-**Inputs:**
-```
-- `location_name` (string, required) — Location resource name, e.g. `accounts/123456789/locations/987654321`
-```
-
-**Output:**
-
-```json
+```typescript
 {
-  "name": "accounts/123456789/locations/987654321",
-  "locationName": "Acme Corp - Downtown",
-  "primaryPhone": "+1-555-555-0100",
-  "websiteUrl": "https://acme.example.com",
-  "address": {
-    "addressLines": ["123 Main St"],
-    "locality": "San Francisco",
-    "administrativeArea": "CA",
-    "postalCode": "94105",
-    "regionCode": "US"
-  },
-  "primaryCategory": {
-    "displayName": "Coffee Shop",
-    "categoryId": "gcid:coffee_shop"
-  }
+  locations: {
+    name: string;
+    languageCode: string | null;
+    storeCode: string | null;
+    title: string | null;
+    phoneNumbers: object | null;
+    categories: object | null;
+    storefrontAddress: object | null;
+    websiteUri: string | null;
+    regularHours: object | null;
+    specialHours: object | null;
+    serviceArea: object | null;
+    labels: any[] | null;
+    adWordsLocationExtensions: object | null;
+    latlng: object | null;
+    openInfo: object | null;
+    metadata: object | null;
+    profile: object | null;
+    relationshipData: object | null;
+    moreHours: any[] | null;
+    serviceItems: any[] | null;
+  }[];
+  nextPageToken: string | null;
+  totalSize: number | null;
 }
 ```
 
 </details>
 
 <details>
-<summary><code>update_location</code> — Update business profile fields</summary>
+<summary><code>create_location</code> — Create a new location owned by the authenticated user</summary>
 
-Updates business profile fields such as description, phone number, website, or hours. Only fields specified in `update_mask` are changed.
+Creates a new Location that will be owned by the logged-in user, and returns the newly created Location.
 
 **Inputs:**
 ```
-- `location_name`  (string, required) — Location resource name, e.g. `accounts/123456789/locations/987654321`
-- `update_mask`    (string, required) — Comma-separated fields to update, e.g. `profile.description,phoneNumbers`
-- `location_data`  (string, required) — JSON string of the location fields to update
+- `parent` (string, required) — The name of the account in which to create this location.
+- `location` (object, required) — Location object to create. Required sub-fields: title (and primaryCategory within categories if categories are set).
+- `validate_only` (boolean, optional) — If true, validates the request without actually creating the location.
+- `request_id` (string, optional) — A unique request ID for the server to detect duplicate requests. UUIDs recommended. Max 50 characters.
 ```
 
-**Output:**
+**Output `data` schema:**
 
-```json
+```typescript
 {
-  "name": "accounts/123456789/locations/987654321",
-  "locationName": "Acme Corp - Downtown",
-  "primaryPhone": "+1-555-555-0199",
-  "websiteUrl": "https://acme.example.com/new",
-  "profile": {
-    "description": "Updated description for our downtown location."
-  }
-}
-```
-
-</details>
-
-
-### Reviews
-
-<details>
-<summary><code>list_reviews</code> — Fetch reviews for a location</summary>
-
-Returns customer reviews for a business location, ordered by update time or rating.
-
-**Inputs:**
-```
-- `location_name`  (string, required)  — Location resource name, e.g. `accounts/123456789/locations/987654321`
-- `page_size`      (integer, optional) — Number of reviews to return, max 50. Default: `20`
-- `order_by`       (string, optional)  — Sort order: `updateTime desc`, `rating desc`, or `rating asc`. Default: `updateTime desc`
-```
-
-**Output:**
-
-```json
-[
-  {
-    "name": "accounts/123456789/locations/987654321/reviews/rev111",
-    "author": "Jane Smith",
-    "rating": "FIVE",
-    "comment": "Amazing coffee and friendly staff!",
-    "createTime": "2025-01-10T14:00:00Z",
-    "reply": null
-  },
-  {
-    "name": "accounts/123456789/locations/987654321/reviews/rev222",
-    "author": "Bob Jones",
-    "rating": "THREE",
-    "comment": "Good place but can get crowded.",
-    "createTime": "2025-01-08T09:30:00Z",
-    "reply": "Thanks for the feedback, Bob!"
-  }
-]
-```
-
-</details>
-
-<details>
-<summary><code>reply_to_review</code> — Post or update a reply to a review</summary>
-
-Posts a new reply or updates an existing reply to a customer review.
-
-**Inputs:**
-```
-- `review_name`  (string, required) — Review resource name, e.g. `accounts/123456789/locations/987654321/reviews/rev111`
-- `reply_text`   (string, required) — The reply text to post (max 4096 characters)
-```
-
-**Output:**
-
-```json
-{
-  "comment": "Thank you so much for the kind words, Jane! We look forward to seeing you again.",
-  "updateTime": "2025-01-11T10:00:00Z"
+  name: string;
+  languageCode: string | null;
+  storeCode: string | null;
+  title: string | null;
+  phoneNumbers: object | null;
+  categories: object | null;
+  storefrontAddress: object | null;
+  websiteUri: string | null;
+  regularHours: object | null;
+  specialHours: object | null;
+  serviceArea: object | null;
+  labels: any[] | null;
+  adWordsLocationExtensions: object | null;
+  latlng: object | null;
+  openInfo: object | null;
+  metadata: object | null;
+  profile: object | null;
+  relationshipData: object | null;
+  moreHours: any[] | null;
+  serviceItems: any[] | null;
 }
 ```
 
 </details>
 
 <details>
-<summary><code>delete_review_reply</code> — Delete a reply to a review</summary>
+<summary><code>get_location</code> — Get a location's merchant-set field values</summary>
 
-Deletes an existing reply to a customer review.
+Returns the specified location as last set by the merchant; may not reflect updates from Google or user-generated content live on Google Maps.
 
 **Inputs:**
 ```
-- `review_name` (string, required) — Review resource name, e.g. `accounts/123456789/locations/987654321/reviews/rev111`
+- `name` (string, required) — The name of the location to fetch.
+- `read_mask` (string, required) — Read mask specifying which fields to return in the response. Comma-separated list of fully qualified field names. Example: "title,websiteUri".
 ```
 
-**Output:**
+**Output `data` schema:**
 
-```json
+```typescript
 {
-  "success": true,
-  "message": "Reply deleted for review: accounts/123456789/locations/987654321/reviews/rev111"
-}
-```
-
-</details>
-
-
-### Posts & Updates
-
-<details>
-<summary><code>list_posts</code> — List posts for a location</summary>
-
-Returns recent posts and updates published to a business location.
-
-**Inputs:**
-```
-- `location_name`  (string, required)  — Location resource name, e.g. `accounts/123456789/locations/987654321`
-- `page_size`      (integer, optional) — Number of posts to return, max 100. Default: `10`
-```
-
-**Output:**
-
-```json
-[
-  {
-    "name": "accounts/123456789/locations/987654321/localPosts/post111",
-    "topicType": "STANDARD",
-    "summary": "We are now open on Sundays from 9am to 5pm!",
-    "state": "LIVE",
-    "createTime": "2025-01-12T08:00:00Z",
-    "updateTime": "2025-01-12T08:00:00Z"
-  }
-]
-```
-
-</details>
-
-<details>
-<summary><code>create_post</code> — Create a post or update</summary>
-
-Creates a new post on a business location. Supports STANDARD, EVENT, OFFER, and PRODUCT post types.
-
-**Inputs:**
-```
-- `location_name`        (string, required)  — Location resource name, e.g. `accounts/123456789/locations/987654321`
-- `summary`              (string, required)  — Main post text (max 1500 characters)
-- `topic_type`           (string, optional)  — Post type: `STANDARD` | `EVENT` | `OFFER` | `PRODUCT`. Default: `STANDARD`
-- `call_to_action_type`  (string, optional)  — CTA button: `BOOK` | `ORDER` | `SHOP` | `LEARN_MORE` | `SIGN_UP` | `CALL`
-- `call_to_action_url`   (string, optional)  — URL for the CTA button
-- `event_title`          (string, optional)  — Title for EVENT posts
-- `event_start`          (string, optional)  — ISO 8601 event start datetime
-- `event_end`            (string, optional)  — ISO 8601 event end datetime
-- `offer_coupon`         (string, optional)  — Coupon code for OFFER posts
-- `offer_terms`          (string, optional)  — Terms and conditions for OFFER posts
-```
-
-**Output:**
-
-```json
-{
-  "name": "accounts/123456789/locations/987654321/localPosts/post222",
-  "topicType": "EVENT",
-  "summary": "Join us for our grand re-opening celebration!",
-  "event": {
-    "title": "Grand Re-Opening",
-    "schedule": {
-      "startDateTime": "2025-02-01T10:00:00Z",
-      "endDateTime": "2025-02-01T18:00:00Z"
-    }
-  },
-  "callToAction": {
-    "actionType": "LEARN_MORE",
-    "url": "https://acme.example.com/event"
-  },
-  "state": "LIVE",
-  "createTime": "2025-01-15T09:00:00Z"
+  name: string;
+  languageCode: string | null;
+  storeCode: string | null;
+  title: string | null;
+  phoneNumbers: object | null;
+  categories: object | null;
+  storefrontAddress: object | null;
+  websiteUri: string | null;
+  regularHours: object | null;
+  specialHours: object | null;
+  serviceArea: object | null;
+  labels: any[] | null;
+  adWordsLocationExtensions: object | null;
+  latlng: object | null;
+  openInfo: object | null;
+  metadata: object | null;
+  profile: object | null;
+  relationshipData: object | null;
+  moreHours: any[] | null;
+  serviceItems: any[] | null;
 }
 ```
 
 </details>
 
 <details>
-<summary><code>delete_post</code> — Delete a post</summary>
+<summary><code>update_location</code> — <strong>UPDATE</strong>: change specific fields on a location and get the before/after state</summary>
 
-Deletes an existing post or update from a business location.
+Updates the specified location's fields per the given update mask, and returns the updated Location. Only the fields you provide are changed — others keep their current value. NOTE: this overwrites the current field values — the original state is not stored after the call. The response includes both the before and after state so you have a full record of what changed.
 
 **Inputs:**
 ```
-- `post_name` (string, required) — Post resource name, e.g. `accounts/123456789/locations/987654321/localPosts/post111`
+- `location_name` (string, required) — Google identifier for this location, in the form locations/{locationId}.
+- `update_mask` (string, required) — The specific fields to update. Comma-separated list of fully qualified field names.
+- `location` (object, required) — Location object carrying the updated field values.
+- `validate_only` (boolean, optional) — If true, validates the request without actually updating; response is empty unless there are validation errors.
 ```
 
-**Output:**
+**Output `data` schema:**
 
-```json
+```typescript
 {
-  "success": true,
-  "message": "Post deleted: accounts/123456789/locations/987654321/localPosts/post111"
+  before: {
+    name: string;
+    languageCode: string | null;
+    storeCode: string | null;
+    title: string | null;
+    phoneNumbers: object | null;
+    categories: object | null;
+    storefrontAddress: object | null;
+    websiteUri: string | null;
+    regularHours: object | null;
+    specialHours: object | null;
+    serviceArea: object | null;
+    labels: any[] | null;
+    adWordsLocationExtensions: object | null;
+    latlng: object | null;
+    openInfo: object | null;
+    metadata: object | null;
+    profile: object | null;
+    relationshipData: object | null;
+    moreHours: any[] | null;
+    serviceItems: any[] | null;
+  };
+  after: {
+    name: string;
+    languageCode: string | null;
+    storeCode: string | null;
+    title: string | null;
+    phoneNumbers: object | null;
+    categories: object | null;
+    storefrontAddress: object | null;
+    websiteUri: string | null;
+    regularHours: object | null;
+    specialHours: object | null;
+    serviceArea: object | null;
+    labels: any[] | null;
+    adWordsLocationExtensions: object | null;
+    latlng: object | null;
+    openInfo: object | null;
+    metadata: object | null;
+    profile: object | null;
+    relationshipData: object | null;
+    moreHours: any[] | null;
+    serviceItems: any[] | null;
+  };
+}
+```
+
+</details>
+
+<details>
+<summary><code>delete_location</code> — <strong>DESTRUCTIVE</strong>: permanently delete a location (requires explicit user confirmation)</summary>
+
+DESTRUCTIVE — REQUIRES EXPLICIT USER CONFIRMATION BEFORE CALLING. Permanently deletes the location. This action is irreversible — the location and its data cannot be recovered via this API (the Google Business Profile website may offer other recovery paths). NEVER call this tool autonomously or as part of an automated flow. You MUST stop, tell the user exactly what will be deleted and that it is permanent, and wait for their explicit written confirmation before proceeding.
+
+**Inputs:**
+```
+- `name` (string, required) — The name of the location to delete.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  // no fields — deletion is confirmed by the envelope's success/statusCode
+}
+```
+
+</details>
+
+<details>
+<summary><code>get_google_updated_location</code> — Get a location as it appears live on Google Maps/Search, with diff and pending masks</summary>
+
+Returns the specified location as it appears live on Google Maps and Search, which may differ from the merchant's version, along with masks of what Google changed and what's still pending.
+
+**Inputs:**
+```
+- `name` (string, required) — The name of the location to fetch.
+- `read_mask` (string, required) — Comma-separated list of fully qualified field names to return.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  location: object;
+  diffMask: string | null;
+  pendingMask: string | null;
+}
+```
+
+</details>
+
+<details>
+<summary><code>get_location_attributes</code> — Get a location's merchant-set attributes</summary>
+
+Retrieves attributes for a location as last set by the merchant.
+
+**Inputs:**
+```
+- `name` (string, required) — Google identifier for this location, in the form locations/{locationId}/attributes.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  name: string;
+  attributes: {
+    name: string;
+    valueType: string | null;
+    values: any[] | null;
+    repeatedEnumValue: object | null;
+    uriValues: any[] | null;
+  }[];
+}
+```
+
+</details>
+
+<details>
+<summary><code>update_location_attributes</code> — <strong>UPDATE</strong>: change specific attributes on a location and get the before/after state</summary>
+
+Updates attributes for a given location per the given attribute mask, and returns the updated Attributes. Only the fields you provide are changed — others keep their current value. NOTE: this overwrites the current field values — the original state is not stored after the call. The response includes both the before and after state so you have a full record of what changed.
+
+**Inputs:**
+```
+- `attributes_name` (string, required) — Google identifier for this location, in the form locations/{locationId}/attributes.
+- `attribute_mask` (string, required) — Attribute names (as attributes/{attribute}) to update. Every attribute you want updated must be in both attributes and attributeMask. To delete an attribute, put it in attributeMask with no matching entry in attributes.
+- `name` (string, required) — Google identifier for this location, in the form locations/{locationId}/attributes (body field, same value as attributes.name).
+- `attributes` (array<object>, optional) — The attributes to set (each with name, valueType, values, repeatedEnumValue, uriValues). May be empty when deleting all attributes via attributeMask.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  before: {
+    name: string;
+    attributes: {
+      name: string;
+      valueType: string | null;
+      values: any[] | null;
+      repeatedEnumValue: object | null;
+      uriValues: any[] | null;
+    }[];
+  };
+  after: {
+    name: string;
+    attributes: {
+      name: string;
+      valueType: string | null;
+      values: any[] | null;
+      repeatedEnumValue: object | null;
+      uriValues: any[] | null;
+    }[];
+  };
+}
+```
+
+</details>
+
+<details>
+<summary><code>get_google_updated_location_attributes</code> — Get a location's attributes as they appear live on Google Maps/Search</summary>
+
+Retrieves attributes for a location as they appear live on Google Maps and Search, which may differ from the merchant's version.
+
+**Inputs:**
+```
+- `name` (string, required) — Google identifier for this location, in the form locations/{locationId}/attributes.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  name: string;
+  attributes: {
+    name: string;
+    valueType: string | null;
+    values: any[] | null;
+    repeatedEnumValue: object | null;
+    uriValues: any[] | null;
+  }[];
 }
 ```
 
 </details>
 
 
-### Insights & Analytics
+### Chains
 
 <details>
-<summary><code>get_insights</code> — Fetch performance insights for locations</summary>
+<summary><code>get_chain</code> — Get a chain by resource name</summary>
 
-Returns performance metrics (views, searches, customer actions) for one or more locations over a date range.
+Gets the specified chain, returning NOT_FOUND if the chain does not exist.
 
 **Inputs:**
 ```
-- `location_names`   (string, required)  — Comma-separated location resource names
-- `start_date`       (string, required)  — Start date in `YYYY-MM-DD` format
-- `end_date`         (string, required)  — End date in `YYYY-MM-DD` format
-- `metric_requests`  (string, optional)  — Metrics to fetch. Use `ALL` or a comma-separated subset: `QUERIES_DIRECT`, `QUERIES_INDIRECT`, `VIEWS_MAPS`, `VIEWS_SEARCH`, `ACTIONS_WEBSITE`, `ACTIONS_PHONE`, `ACTIONS_DRIVING_DIRECTIONS`. Default: `ALL`
+- `name` (string, required) — The chain's resource name, in the format `chains/{chain_place_id}`.
 ```
 
-**Output:**
+**Output `data` schema:**
 
-```json
+```typescript
 {
-  "locationMetrics": [
-    {
-      "locationName": "accounts/123456789/locations/987654321",
-      "timeZone": "America/Los_Angeles",
-      "metricValues": [
-        {
-          "metric": "QUERIES_DIRECT",
-          "totalValue": { "metricOption": "AGGREGATED_TOTAL", "value": "320" }
-        },
-        {
-          "metric": "VIEWS_SEARCH",
-          "totalValue": { "metricOption": "AGGREGATED_TOTAL", "value": "1540" }
-        },
-        {
-          "metric": "ACTIONS_WEBSITE",
-          "totalValue": { "metricOption": "AGGREGATED_TOTAL", "value": "87" }
-        }
-      ]
-    }
-  ]
+  name: string;
+  chainNames: {
+    displayName: string | null;
+    languageCode: string | null;
+  }[] | null;
+  websites: {
+    uri: string | null;
+  }[] | null;
+  locationCount: number | null;
 }
 ```
 
 </details>
 
 <details>
-<summary><code>get_review_summary</code> — Get review stats for a location</summary>
+<summary><code>search_chains</code> — Search chains by name</summary>
 
-Returns a computed summary of review statistics including total count, average rating, reply rate, and rating distribution.
+Searches for a chain based on chain name and returns the list of matching chains.
 
 **Inputs:**
 ```
-- `location_name` (string, required) — Location resource name, e.g. `accounts/123456789/locations/987654321`
+- `chain_name` (string, required) — Search for a chain by its name. Exact/partial/fuzzy/related queries are supported. Examples: "walmart", "wal-mart", "walmmmart", "沃尔玛".
+- `page_size` (integer, optional, default: 10) — The maximum number of matched chains to return from this query. Default is 10, maximum is 500.
 ```
 
-**Output:**
+**Output `data` schema:**
 
-```json
+```typescript
 {
-  "total_reviews": 48,
-  "average_rating": 4.35,
-  "replied_to": 31,
-  "unreplied": 17,
-  "rating_distribution": {
-    "1": 2,
-    "2": 3,
-    "3": 5,
-    "4": 14,
-    "5": 24
-  }
+  chains: {
+    name: string;
+    chainNames: {
+      displayName: string | null;
+      languageCode: string | null;
+    }[] | null;
+    websites: {
+      uri: string | null;
+    }[] | null;
+    locationCount: number | null;
+  }[] | null;
+}
+```
+
+</details>
+
+
+### Categories
+
+<details>
+<summary><code>list_categories</code> — List business categories matching the front of a name</summary>
+
+Returns a list of business categories matched by the front of the category name (e.g. 'food' matches 'Food Court' but not 'Fast Food Restaurant').
+
+**Inputs:**
+```
+- `region_code` (string, required) — The ISO 3166-1 alpha-2 country code.
+- `language_code` (string, required) — The BCP 47 code of the language.
+- `view` (string, required) — Specifies which parts of the Category resource to return. Values: `CATEGORY_VIEW_UNSPECIFIED` (equivalent to `BASIC`), `BASIC` (only `displayName`, `category_id`, `languageCode`), `FULL` (all fields).
+- `filter_` (string, optional) — Filter string from the user; the only supported field is `displayName`, e.g. `filter=displayName=foo`.
+- `page_size` (integer, optional) — How many categories to fetch per page. Default is 100, minimum is 1, maximum is 100.
+- `page_token` (string, optional) — If specified, fetches the next page of categories.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  categories: {
+    name: string | null;
+    displayName: string | null;
+    languageCode: string | null;
+  }[] | null;
+  nextPageToken: string | null;
+}
+```
+
+</details>
+
+<details>
+<summary><code>batch_get_categories</code> — Get business categories for a set of category IDs</summary>
+
+Returns a list of business categories for the provided language and category (GConcept) IDs.
+
+**Inputs:**
+```
+- `names` (array<string>, required) — The GConcept ids the localized category names should be returned for. Repeat this parameter to request more than one category; at least one name must be set.
+- `language_code` (string, required) — The BCP 47 code of the language that the category names should be returned in.
+- `view` (string, required) — Specifies which parts of the Category resource to return. Values: `CATEGORY_VIEW_UNSPECIFIED` (equivalent to `BASIC`), `BASIC` (only `displayName`, `category_id`, `languageCode`), `FULL` (all fields).
+- `region_code` (string, optional) — The ISO 3166-1 alpha-2 country code used to infer non-standard language.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  categories: {
+    name: string | null;
+    displayName: string | null;
+    languageCode: string | null;
+  }[] | null;
+}
+```
+
+</details>
+
+
+### Attributes
+
+<details>
+<summary><code>list_available_attributes</code> — List attributes available for a location's category and country</summary>
+
+Returns the list of attributes that would be available for a location with the given primary category and country. Provide exactly one of: `parent` (the resource name of an existing location), OR `category_name` together with `region_code` and `language_code`. Set `show_all` to true to get metadata for all available attributes regardless of `parent`/`category_name` — in that case `region_code` and `language_code` are required. Use `page_token` from a previous response to page through results.
+
+**Inputs:**
+```
+- `parent` (string, optional) — Resource name of the location to look up available attributes for. If set, category_name, region_code, language_code and show_all are not required and must not be set.
+- `category_name` (string, optional) — The primary category stable ID to find available attributes. Must be of the format categories/{category_id}.
+- `region_code` (string, optional) — The ISO 3166-1 alpha-2 country code to find available attributes.
+- `language_code` (string, optional) — The BCP 47 code of language to get attribute display names in. Falls back to English if unavailable.
+- `show_all` (boolean, optional) — If true, metadata for all available attributes is returned, disregarding parent and category_name. region_code and language_code are required when this is true.
+- `page_size` (integer, optional) — How many attributes to include per page. Default is 200, minimum is 1.
+- `page_token` (string, optional) — If specified, the next page of attribute metadata is retrieved.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  attributeMetadata: {
+    parent: string | null;
+    valueType: string | null;
+    displayName: string | null;
+    groupDisplayName: string | null;
+    repeatable: boolean | null;
+    valueMetadata: any[] | null;
+    deprecated: boolean | null;
+  }[] | null;
+  nextPageToken: string | null;
+}
+```
+
+</details>
+
+
+### Google Locations
+
+<details>
+<summary><code>search_google_locations</code> — Search Google's own location records by location details or text query</summary>
+
+Searches all of the possible locations on Google that are a match to the specified request and returns the matching GoogleLocation entries. Exactly one of `location` or `query` must be provided.
+
+**Inputs:**
+```
+- `page_size` (integer, optional) — The number of matches to return. Default is 3, maximum is 10. No pagination.
+- `location` (object, optional) — Union field `search_query` — exactly one of `location` or `query` is required. Location to search for; if provided, finds locations matching the provided details.
+- `query` (string, optional) — Union field `search_query` — exactly one of `location` or `query` is required. Text query to search for. Less accurate than an exact location, but can surface more inexact matches.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  googleLocations: {
+    name: string | null;
+    location: object | null;
+    requestAdminRightsUri: string | null;
+  }[] | null;
+}
+```
+
+</details>
+
+
+### Performance
+
+<details>
+<summary><code>get_daily_metrics_time_series</code> — Get a date-range time series for one daily metric</summary>
+
+Returns the values for each date in a given time range for a single specified daily metric. Only daily data is available; hourly metrics are not supported.
+
+**Inputs:**
+```
+- `name` (string, required) — The location for which the time series should be fetched. Format: `locations/{locationId}` where `locationId` is an unobfuscated listing id.
+- `daily_metric` (string, required) — The metric to retrieve time series for. One of: `DAILY_METRIC_UNKNOWN`, `BUSINESS_IMPRESSIONS_DESKTOP_MAPS`, `BUSINESS_IMPRESSIONS_DESKTOP_SEARCH`, `BUSINESS_IMPRESSIONS_MOBILE_MAPS`, `BUSINESS_IMPRESSIONS_MOBILE_SEARCH`, `BUSINESS_CONVERSATIONS`, `BUSINESS_DIRECTION_REQUESTS`, `CALL_CLICKS`, `WEBSITE_CLICKS`, `BUSINESS_BOOKINGS`, `BUSINESS_FOOD_ORDERS`, `BUSINESS_FOOD_MENU_CLICKS`.
+- `daily_range` (object, required) — The timerange to fetch. `{ "startDate": {"year", "month", "day"}, "endDate": {"year", "month", "day"} }`, both inclusive.
+- `daily_sub_entity_type` (object, optional) — The sub-entity type/id the time series relates to. Currently no `DailyMetric` supports this (breakdown not available). Union of `dayOfWeek` (enum) or `timeOfDay` (`{"hours", "minutes", "seconds", "nanos"}`).
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  timeSeries: {
+    datedValues: {
+      date: object | null;
+      value: string | null;
+    }[] | null;
+  } | null;
+}
+```
+
+</details>
+
+<details>
+<summary><code>fetch_multi_daily_metrics_time_series</code> — Get a date-range time series for multiple daily metrics at once</summary>
+
+Returns the values for each date in a given time range for multiple specified daily metrics at once. Only daily data is available; hourly metrics are not supported.
+
+**Inputs:**
+```
+- `location` (string, required) — The location for which the time series should be fetched. Format: `locations/{locationId}` where `locationId` is an unobfuscated listing id.
+- `daily_metrics` (array<string>, required) — The metrics to retrieve time series for. Same enum values as `get_daily_metrics_time_series`. Repeat this parameter for multiple metrics.
+- `daily_range` (object, required) — The timerange to fetch. `{ "startDate": {"year", "month", "day"}, "endDate": {"year", "month", "day"} }`, both inclusive.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  multiDailyMetricTimeSeries: {
+    dailyMetricTimeSeries: {
+      dailyMetric: string | null;
+      dailySubEntityType: object | null;
+      timeSeries: {
+        datedValues: {
+          date: object | null;
+          value: string | null;
+        }[] | null;
+      } | null;
+    }[] | null;
+  }[] | null;
+}
+```
+
+</details>
+
+<details>
+<summary><code>list_search_keyword_impressions_monthly</code> — List monthly search-keyword impression counts for a location</summary>
+
+Returns the search keywords used to find a business in Search or Maps, each accompanied by impression counts aggregated on a monthly basis.
+
+**Inputs:**
+```
+- `parent` (string, required) — The location for which the time series should be fetched. Format: `locations/{locationId}` where `locationId` is an unobfuscated listing id.
+- `monthly_range` (object, required) — The range in months to aggregate search keyword impressions over. `{ "startMonth": {"year", "month", "day"}, "endMonth": {"year", "month", "day"} }`, both inclusive — only year and month are considered.
+- `page_size` (integer, optional, default: 100) — Number of results requested. Default 100, maximum 100.
+- `page_token` (string, optional) — Base64-encoded token indicating the next paginated result to return.
+```
+
+**Output `data` schema:**
+
+```typescript
+{
+  searchKeywordsCounts: {
+    searchKeyword: string | null;
+    insightsValue: {
+      value: string | null;
+      threshold: string | null;
+    } | null;
+  }[] | null;
+  nextPageToken: string | null;
 }
 ```
 
@@ -397,52 +646,84 @@ Returns a computed summary of review statistics including total count, average r
 ## API Parameters Reference
 
 <details>
-<summary><strong>Resource Name Formats</strong></summary>
+<summary><strong>Response Envelope</strong></summary>
 
-All Google Business Profile resources use hierarchical resource names:
+Every tool returns the same top-level envelope. Only `data` varies per tool.
 
-**Account:**
+```json
+// Success
+{
+  "success": true,
+  "statusCode": 200,
+  "retriable": false,
+  "retry_after_seconds": null,
+  "error": null,
+  "data": { ... }
+}
+
+// Error
+{
+  "success": false,
+  "statusCode": 400,
+  "retriable": false,
+  "retry_after_seconds": null,
+  "error": { "code": "VALIDATION_ERROR", "message": "page_size must be between 1 and 100", "details": null },
+  "data": null
+}
 ```
-accounts/{account_id}
-Example: accounts/123456789
-```
+
+- `retriable` — `true` when it is safe to retry (rate limit, network error, 503). `false` for validation and auth errors.
+- `retry_after_seconds` — seconds to wait before retrying; present only when `retriable` is `true` and the upstream specifies a delay.
+- `error.code` — machine-readable string: `VALIDATION_ERROR` (bad input, caught before the call is made), `AUTH_ERROR` (no OAuth access token on the credential), `UPSTREAM_ERROR` (Google's API returned an error status), `SERVER_ERROR` (unexpected failure).
+
+</details>
+
+<details>
+<summary><strong>Common Parameters</strong></summary>
+
+- `page_size` — Maximum number of results to return per page. Every list/search tool defines its own default and maximum — see that tool's Inputs.
+- `page_token` — Opaque pagination token from a previous response's `nextPageToken` (or equivalent), used to fetch the next page of results.
+- `filter_` — Tool-specific filter expression constraining which records are returned; the supported fields differ per tool (see `list_locations` and `list_categories`).
+
+</details>
+
+<details>
+<summary><strong>Resource Formats</strong></summary>
 
 **Location:**
-```
-accounts/{account_id}/locations/{location_id}
-Example: accounts/123456789/locations/987654321
-```
 
-**Review:**
 ```
-accounts/{account_id}/locations/{location_id}/reviews/{review_id}
-Example: accounts/123456789/locations/987654321/reviews/rev111
+locations/{locationId}
+Example: locations/12345678901234567890
 ```
 
-**Post:**
+**Location Attributes:**
+
 ```
-accounts/{account_id}/locations/{location_id}/localPosts/{post_id}
-Example: accounts/123456789/locations/987654321/localPosts/post111
+locations/{locationId}/attributes
+Example: locations/12345678901234567890/attributes
 ```
 
-</details>
+**Attribute:**
 
-<details>
-<summary><strong>Post Topic Types</strong></summary>
+```
+attributes/{attribute}
+Example: attributes/has_wifi
+```
 
-- `STANDARD` — General update or announcement
-- `EVENT` — Time-bound event with title, start, and end datetime
-- `OFFER` — Promotional offer with optional coupon code and terms
-- `PRODUCT` — Product highlight with name and description
+**Chain:**
 
-</details>
+```
+chains/{chain_place_id}
+Example: chains/10248
+```
 
-<details>
-<summary><strong>Review Star Ratings</strong></summary>
+**Category:**
 
-Google returns star ratings as strings: `ONE`, `TWO`, `THREE`, `FOUR`, `FIVE`.
-
-The `get_review_summary` tool maps these to numeric values (1–5) for the rating distribution output.
+```
+categories/{category_id}
+Example: categories/gcid:coffee_shop
+```
 
 </details>
 
@@ -452,9 +733,9 @@ The `get_review_summary` tool maps these to numeric values (1–5) for the ratin
 <details>
 <summary><strong>Missing or Invalid Headers</strong></summary>
 
-- **Cause:** OAuth token not provided in request headers or incorrect format
+- **Cause:** OAuth access token not provided in request headers or incorrect format
 - **Solution:**
-  1. Verify `Authorization: Bearer YOUR_TOKEN` and `X-Mewcp-Credential-Id: CREDENTIAL-ID` headers are present
+  1. Verify `Authorization: Bearer YOUR_ACCESS_TOKEN` and `X-Mewcp-Credential-Id: CREDENTIAL-ID` headers are present
   2. Check that your Google credential is active in your MewCP account
 
 </details>
@@ -473,7 +754,7 @@ The `get_review_summary` tool maps these to numeric values (1–5) for the ratin
 <details>
 <summary><strong>Credential Not Connected</strong></summary>
 
-- **Cause:** No Google Business Profile credential linked to your account
+- **Cause:** No Google credential linked to your account
 - **Solution:**
   1. Go to **Credentials** in your MewCP dashboard
   2. Connect your Google account via OAuth
@@ -484,10 +765,10 @@ The `get_review_summary` tool maps these to numeric values (1–5) for the ratin
 <details>
 <summary><strong>Malformed Request Payload</strong></summary>
 
-- **Cause:** JSON payload in `location_data` is invalid or `update_mask` fields do not match the payload keys
+- **Cause:** JSON payload is invalid or missing required fields
 - **Solution:**
   1. Validate JSON syntax before sending
-  2. Ensure `update_mask` field names exactly match keys in your `location_data` JSON
+  2. Ensure all required tool parameters are included
   3. Check parameter types match expected values
 
 </details>
@@ -506,11 +787,11 @@ The `get_review_summary` tool maps these to numeric values (1–5) for the ratin
 <details>
 <summary><strong>Google Business Profile API Error</strong></summary>
 
-- **Cause:** Upstream Google Business Profile API returned an error (e.g. 403 Forbidden, 404 Not Found)
+- **Cause:** Upstream My Business Business Information API or Business Profile Performance API call returned an error
 - **Solution:**
-  1. Check the [Google Workspace Status Dashboard](https://workspace.google.com/status) for outages
-  2. Verify your Google account is an owner or manager of the business location
-  3. Ensure the `business.manage` scope is granted in your OAuth credential
+  1. Check the [Google Cloud Status Dashboard](https://status.cloud.google.com/) for outages
+  2. Verify your Google account is an owner or manager of the business location, and that the `business.manage` scope was granted during OAuth
+  3. Review the error message for specific details
 
 </details>
 
@@ -519,9 +800,9 @@ The `get_review_summary` tool maps these to numeric values (1–5) for the ratin
 <details>
 <summary><strong>Resources</strong></summary>
 
-- **[Google Business Profile API Documentation](https://developers.google.com/my-business/content/overview)** — Official API overview
-- **[Google Business Profile API Reference](https://developers.google.com/my-business/reference/rest)** — Complete endpoint reference
+- **[My Business Business Information API Reference](https://developers.google.com/my-business/reference/businessinformation/rest)** — Complete endpoint reference for locations, chains, categories, attributes, and Google Locations
+- **[Business Profile Performance API Reference](https://developers.google.com/my-business/reference/performance/rest)** — Complete endpoint reference for performance metrics and search keyword impressions
 - **[FastMCP Docs](https://gofastmcp.com/v2/getting-started/welcome)** — FastMCP specification
-- **[FastMCP Credentials](https://pypi.org/project/fastmcp-credentials/)** — Credential handling package
+- **[FastMCP Credentials](https://pypi.org/project/fastmcp-credentials/)** — FastMCP Credentials package for credential handling
 
 </details>
