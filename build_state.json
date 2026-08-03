@@ -1,0 +1,18 @@
+{
+  "manifest_server_block": true,
+  "planning": true,
+  "infra": false,
+  "tool_groups": {},
+  "built_from": {
+    "locations": ["list_locations.md", "create_location.md", "get_location.md", "update_location.md", "delete_location.md", "get_google_updated_location.md", "get_location_attributes.md", "update_location_attributes.md", "get_google_updated_location_attributes.md"],
+    "chains": ["get_chain.md", "search_chains.md"],
+    "categories": ["list_categories.md", "batch_get_categories.md"],
+    "attributes": ["list_available_attributes.md"],
+    "google_locations": ["search_google_locations.md"],
+    "performance": ["get_daily_metrics_time_series.md", "fetch_multi_daily_metrics_time_series.md", "list_search_keyword_impressions_monthly.md"]
+  },
+  "validation_rounds": 0,
+  "validation_passed": false,
+  "docs_status_written": false,
+  "readme": false
+}
