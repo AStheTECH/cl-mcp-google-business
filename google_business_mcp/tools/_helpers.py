@@ -2,6 +2,8 @@
 
 import json
 
+import pydantic
+from fastmcp_credentials import CredentialError
 from googleapiclient.errors import HttpError
 
 from ..logging_utils import ToolLogger
@@ -30,7 +32,14 @@ def _handle_request_exc(result_class, tlog, exc):
         tlog.failure("UPSTREAM_ERROR", f"HTTP {status}")
         return result_class(success=False, statusCode=status, retriable=retriable,
             error=ToolError(code="UPSTREAM_ERROR", message=str(message)))
-    if isinstance(exc, ValueError):
+    # Must precede ValueError — ValidationError subclasses it.
+    if isinstance(exc, pydantic.ValidationError):
+        tlog.failure("UPSTREAM_ERROR", str(exc))  # detail stays in the log
+        return result_class(success=False, statusCode=502, retriable=False,
+            error=ToolError(code="UPSTREAM_ERROR",
+                            message="Upstream response did not match the expected schema"))
+    # CredentialError subclasses Exception, not ValueError.
+    if isinstance(exc, (CredentialError, ValueError)):
         tlog.failure("AUTH_ERROR", str(exc))
         return result_class(success=False, statusCode=401, retriable=False,
             error=ToolError(code="AUTH_ERROR", message=str(exc)))
